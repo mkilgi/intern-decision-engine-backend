@@ -8,6 +8,9 @@ import ee.taltech.inbankbackend.exceptions.InvalidPersonalCodeException;
 import ee.taltech.inbankbackend.exceptions.NoValidLoanException;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+
 /**
  * A service class that provides a method for calculating an approved loan amount and period for a customer.
  * The loan amount is calculated based on the customer's credit modifier,
@@ -35,7 +38,7 @@ public class DecisionEngine {
      * @throws InvalidLoanPeriodException If the requested loan period is invalid
      * @throws NoValidLoanException If there is no valid loan found for the given ID code, loan amount and loan period
      */
-    public Decision calculateApprovedLoan(String personalCode, Long loanAmount, int loanPeriod)
+    public Decision calculateApprovedLoan(String personalCode, int loanAmount, int loanPeriod)
             throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException,
             NoValidLoanException {
         try {
@@ -51,14 +54,22 @@ public class DecisionEngine {
             throw new NoValidLoanException("No valid loan found!");
         }
 
-        while (highestValidLoanAmount(loanPeriod) < DecisionEngineConstants.MINIMUM_LOAN_AMOUNT) {
-            loanPeriod++;
+        while (highestValidLoanAmount(loanPeriod) < loanAmount) {
+            loanPeriod+=6;
         }
 
         if (loanPeriod <= DecisionEngineConstants.MAXIMUM_LOAN_PERIOD) {
             outputLoanAmount = Math.min(DecisionEngineConstants.MAXIMUM_LOAN_AMOUNT, highestValidLoanAmount(loanPeriod));
         } else {
-            throw new NoValidLoanException("No valid loan found!");
+            // if there is no loan approved for the requested amount, then respond with the biggest possible loan
+            loanPeriod = 60;
+            outputLoanAmount = highestValidLoanAmount(loanPeriod);
+
+            if (outputLoanAmount >= DecisionEngineConstants.MINIMUM_LOAN_AMOUNT) {
+                return new Decision(outputLoanAmount, loanPeriod, String.format("No valid loan found for amount %s eur", loanAmount));
+            }
+
+            throw new NoValidLoanException(String.format("No valid loan found for amount %s eur", loanAmount));
         }
 
         return new Decision(outputLoanAmount, loanPeriod, null);
@@ -108,7 +119,7 @@ public class DecisionEngine {
      * @throws InvalidLoanAmountException If the requested loan amount is invalid
      * @throws InvalidLoanPeriodException If the requested loan period is invalid
      */
-    private void verifyInputs(String personalCode, Long loanAmount, int loanPeriod)
+    private void verifyInputs(String personalCode, int loanAmount, int loanPeriod)
             throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException {
 
         if (!validator.isValid(personalCode)) {

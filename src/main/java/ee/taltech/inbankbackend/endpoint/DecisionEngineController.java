@@ -9,11 +9,7 @@ import ee.taltech.inbankbackend.service.DecisionEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/loan")
@@ -42,7 +38,7 @@ public class DecisionEngineController {
      * @param request The request body containing the customer's personal ID code, requested loan amount, and loan period
      * @return A ResponseEntity with a DecisionResponse body containing the approved loan amount and period, and an error message (if any)
      */
-    @PostMapping("/decision")
+    @PostMapping()
     public ResponseEntity<DecisionResponse> requestDecision(@RequestBody DecisionRequest request) {
         try {
             Decision decision = decisionEngine.
