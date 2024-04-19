@@ -1,7 +1,7 @@
 # Code Review
 
 ## Overview
-The project is well organized with all .java files managed in different packages. Important methods are provided with well-explained javadocs and comments are generally concise and understandable. Exceptions are handled and easy to read. You made my job quite easy. Here are my findings:
+The project is very well organized and the README.md file provided clear instructions on how to get the project running. All .java files are managed in different packages. Important methods are provided with well-explained javadocs and comments are generally concise and understandable. Exceptions are handled and easy to read. You made my job quite easy. Here are my findings:
 
 ## Main fixes
 
