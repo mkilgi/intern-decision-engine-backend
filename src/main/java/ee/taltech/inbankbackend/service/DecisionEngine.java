@@ -1,15 +1,13 @@
 package ee.taltech.inbankbackend.service;
 
+import com.github.vladislavgoltjajev.personalcode.exception.PersonalCodeException;
+import com.github.vladislavgoltjajev.personalcode.locale.estonia.EstonianPersonalCodeParser;
 import com.github.vladislavgoltjajev.personalcode.locale.estonia.EstonianPersonalCodeValidator;
 import ee.taltech.inbankbackend.config.DecisionEngineConstants;
-import ee.taltech.inbankbackend.exceptions.InvalidLoanAmountException;
-import ee.taltech.inbankbackend.exceptions.InvalidLoanPeriodException;
-import ee.taltech.inbankbackend.exceptions.InvalidPersonalCodeException;
-import ee.taltech.inbankbackend.exceptions.NoValidLoanException;
+import ee.taltech.inbankbackend.exceptions.*;
 import org.springframework.stereotype.Service;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Locale;
+import java.time.LocalDate;
+import java.time.Period;
 
 /**
  * A service class that provides a method for calculating an approved loan amount and period for a customer.
@@ -21,6 +19,7 @@ public class DecisionEngine {
 
     // Used to check for the validity of the presented ID code.
     private final EstonianPersonalCodeValidator validator = new EstonianPersonalCodeValidator();
+    private final EstonianPersonalCodeParser parser =  new EstonianPersonalCodeParser();
     private int creditModifier = 0;
 
     /**
@@ -40,7 +39,7 @@ public class DecisionEngine {
      */
     public Decision calculateApprovedLoan(String personalCode, int loanAmount, int loanPeriod)
             throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException,
-            NoValidLoanException {
+            NoValidLoanException, InvalidAgeException {
         try {
             verifyInputs(personalCode, loanAmount, loanPeriod);
         } catch (Exception e) {
@@ -109,6 +108,73 @@ public class DecisionEngine {
     }
 
     /**
+     * Let's say that personal codes are in the same format in all countries, and they have the country data in them
+     * This is completely random
+     * @param personalCode given personal code
+     * @return nationality
+     */
+    private String getCountry(String personalCode) {
+
+        int digits = Integer.parseInt(personalCode.substring(7,10));
+
+        if (digits < 200) {
+            return "Estonia";
+        } else if (digits < 500) {
+            return "Latvia";
+        } else {
+            return "Lithuania";
+        }
+    }
+
+    /**
+     * get specific life expectancy for each country
+     * @param country given country
+     * @return life expectancy
+     */
+    private Period getLifeExpectancy(String country) {
+        Period lifeExpectancy;
+        switch (country) {
+            case "Estonia" -> lifeExpectancy = lifeExpectancy = DecisionEngineConstants.ESTONIA_LIFE_EXPECTANCY;
+            case "Latvia" -> lifeExpectancy = DecisionEngineConstants.LATVIA_LIFE_EXPECTANCY;
+            case "Lithuania" -> lifeExpectancy = DecisionEngineConstants.LITHUANIA_LIFE_EXPECTANCY;
+            default -> lifeExpectancy = Period.of(64, 10, 10);
+        }
+
+        return lifeExpectancy;
+    }
+
+    /**
+     * Method for validating age restrictions
+     * @param personalCode given personal ID code
+     * @throws InvalidAgeException age is not valid to given restrictions
+     * @throws PersonalCodeException unexpected server error
+     */
+    private void validateAge(String personalCode) throws InvalidAgeException, PersonalCodeException {
+
+        // Verify age
+        Period age = parser.getAge(personalCode);
+
+        if (age.getYears() < 18) {
+            throw new InvalidAgeException("You must be of legal age to apply for a loan!");
+        }
+
+        // Get personal data
+        LocalDate dateOfBirth = parser.getDateOfBirth(personalCode);
+        Period lifeExpectancy = getLifeExpectancy(getCountry(personalCode));
+
+        //
+        LocalDate expectedDateOfDeath = dateOfBirth.plus(lifeExpectancy);
+        LocalDate dateNow = LocalDate.now();
+
+        // Expected period alive must be more than 60 months (5 years)
+        Period expectedPeriodAlive = Period.between(dateNow, expectedDateOfDeath);
+
+        if (expectedPeriodAlive.getYears() < 5) {
+            throw new InvalidAgeException("Loan application age limit exceeded!");
+        }
+    }
+
+    /**
      * Verify that all inputs are valid according to business rules.
      * If inputs are invalid, then throws corresponding exceptions.
      *
@@ -120,7 +186,7 @@ public class DecisionEngine {
      * @throws InvalidLoanPeriodException If the requested loan period is invalid
      */
     private void verifyInputs(String personalCode, int loanAmount, int loanPeriod)
-            throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException {
+            throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException, InvalidAgeException, PersonalCodeException {
 
         if (!validator.isValid(personalCode)) {
             throw new InvalidPersonalCodeException("Invalid personal ID code!");
@@ -134,5 +200,6 @@ public class DecisionEngine {
             throw new InvalidLoanPeriodException("Invalid loan period!");
         }
 
+        validateAge(personalCode);
     }
 }
